@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using RedisKeyMover.Data.Contexts;
 using RedisKeyMover.Models;
 using StackExchange.Redis;
 
@@ -27,12 +29,15 @@ public static class RedisDataHelper
             return;
         }
 
+        await using var dbContext = AppDbContextFactory.Instance.CreateContext();
         var readTasks = keys.Select(x => ReadKeyDataAsync(sourceDatabase, x));
         await Task.WhenAll(readTasks);
 
         var writeTasks = keys.Where(x => x.Success).Select(x => WriteKeyDataAsync(targetDatabase, x));
         await Task.WhenAll(writeTasks);
 
+        await dbContext.RedisOperationKeys.Where(x => keys.Where(k => k.Success).Select(k => k.Id).Contains(x.Id))
+            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Success, true));
         if (deleteSourceKeys && keys.Exists(x => x.Success))
         {
             await DeleteSourceKeysAsync(sourceDatabase, keys.Where(x => x.Success));

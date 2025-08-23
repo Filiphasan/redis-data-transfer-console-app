@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using RedisKeyMover.Data.Contexts;
 using RedisKeyMover.Data.Entities;
@@ -142,5 +143,42 @@ public static class RedisTransferDataHelper
 
         allDbKeys.Clear();
         operationModel.Keys = keys;
+    }
+
+    public static async Task StartTransferOperationAsync(this RedisOperationModel operationModel)
+    {
+        var watch = Stopwatch.StartNew();
+        var chunkList = operationModel.Keys.Chunk(operationModel.BatchCount).ToList();
+        operationModel.Keys.Clear();
+        var chunkIndex = 0;
+        var totalChunks = chunkList.Count;
+        var totalSuccessCount = 0;
+        var totalFailCount = 0;
+        long totalElapsedMilliseconds = 0;
+
+        foreach (var keys in chunkList)
+        {
+            watch.Restart();
+            chunkIndex++;
+
+            var list = keys.ToList();
+            await operationModel.SourceDatabase.TransferKeysAsync(operationModel.TargetDatabase, list, operationModel.DeleteSourceKeys);
+            var successCount = list.Count(r => r.Success);
+            var failCount = list.Count - successCount;
+            totalSuccessCount += successCount;
+            totalFailCount += failCount;
+
+            list.Clear();
+            watch.Stop();
+            var elapsed = watch.ElapsedMilliseconds;
+            totalElapsedMilliseconds += elapsed;
+            ConsoleHelper.WriteInfo($"\rPaket {chunkIndex:N0}/{totalChunks:N0} - Başarılı: {successCount:N0}, Başarısız: {failCount:N0}, Süre: {elapsed:N0} ms");
+        }
+
+        await using var dbContext = AppDbContextFactory.Instance.CreateContext();
+        await dbContext.RedisOperations.Where(x => x.Id == operationModel.Operation.Id).ExecuteUpdateAsync(x => x.SetProperty(p => p.EndTime, DateTime.Now));
+        ConsoleHelper.WriteInfo($"\rToplamda {totalSuccessCount:N0} adet anahtar başarıyla taşındı, {totalFailCount:N0} adet anahtar taşınamadı. Toplam Süre: {totalElapsedMilliseconds:N0} ms");
+
+        chunkList.Clear();
     }
 }

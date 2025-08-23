@@ -121,38 +121,7 @@ if (!ConsoleHelper.ReadLineAsAccept("Devam etmek istiyor musunuz?"))
 
 ConsoleHelper.Write("Anahtarlar taşınıyor...");
 
-watch.Restart();
-
-var chunkList = operationModel.Keys.Chunk(operationModel.BatchCount).ToList();
-operationModel.Keys.Clear();
-var chunkIndex = 0;
-var totalChunks = chunkList.Count;
-var totalSuccessCount = 0;
-var totalFailCount = 0;
-long totalElapsedMilliseconds = 0;
-
-foreach (var keys in chunkList)
-{
-    watch.Restart();
-    chunkIndex++;
-
-    var list = keys.ToList();
-    await sourceDatabase.TransferKeysAsync(targetDatabase, list, operationModel.DeleteSourceKeys);
-    var successCount = list.Count(r => r.Success);
-    var failCount = list.Count - successCount;
-    totalSuccessCount += successCount;
-    totalFailCount += failCount;
-
-    list.Clear();
-    watch.Stop();
-    var elapsed = watch.ElapsedMilliseconds;
-    totalElapsedMilliseconds += elapsed;
-    ConsoleHelper.WriteInfo($"\rPaket {chunkIndex:N0}/{totalChunks:N0} - Başarılı: {successCount:N0}, Başarısız: {failCount:N0}, Süre: {elapsed:N0} ms");
-}
-
-ConsoleHelper.WriteInfo($"\rToplamda {totalSuccessCount:N0} adet anahtar başarıyla taşındı, {totalFailCount:N0} adet anahtar taşınamadı. Toplam Süre: {totalElapsedMilliseconds:N0} ms");
-
-chunkList.Clear();
+await operationModel.StartTransferOperationAsync();
 
 ConsoleHelper.WriteLineWithSeperator("", false);
 ConsoleHelper.WriteSuccess("Anahtarlar başarıyla taşındı, Kapatmak için ENTER tuşuna basınız.");
