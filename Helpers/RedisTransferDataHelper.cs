@@ -131,7 +131,18 @@ public static class RedisTransferDataHelper
         if (operationModel.ReadSourceNewKeys)
         {
             var sourceAllKeys = await operationModel.SourceDatabase.ReadAllKeysAsync(operationModel.Operation.Pattern);
-            keys.AddRange(sourceAllKeys.Where(x => !allDbKeys.Exists(y => y.Key == x.Key)));
+            var newKeys = sourceAllKeys.Where(x => !allDbKeys.Exists(y => y.Key == x.Key)).ToList();
+            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 10 };
+            await Parallel.ForEachAsync(newKeys, parallelOptions, async (key, ct) =>
+            {
+                await using var dbContextInner = AppDbContextFactory.Instance.CreateContext();
+                var entity = new RedisOperationKey { Key = key.Key, OperationId = operationModel.Operation.Id, Operation = operationModel.Operation, Success = false, KeyType = (int)key.KeyType };
+                await dbContextInner.RedisOperationKeys.AddAsync(entity, ct);
+                await dbContextInner.SaveChangesAsync(ct);
+                key.Id = entity.Id;
+            });
+            keys.AddRange(newKeys);
+            newKeys.Clear();
             sourceAllKeys.Clear();
         }
 
