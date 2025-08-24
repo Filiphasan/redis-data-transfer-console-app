@@ -112,7 +112,7 @@ public static class RedisTransferDataHelper
         await Parallel.ForEachAsync(sourceAllKeys, parallelOptions, async (key, ct) =>
         {
             await using var dbContext = AppDbContextFactory.Instance.CreateContext();
-            var entity = new RedisOperationKey { Key = key.Key, OperationId = operationModel.Operation.Id, Operation = operationModel.Operation, Success = false, KeyType = (int)key.KeyType };
+            var entity = new RedisOperationKey { Key = key.Key, OperationId = operationModel.Operation.Id, Success = false, KeyType = (int)key.KeyType };
             await dbContext.RedisOperationKeys.AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
             key.Id = entity.Id;
@@ -136,7 +136,7 @@ public static class RedisTransferDataHelper
             await Parallel.ForEachAsync(newKeys, parallelOptions, async (key, ct) =>
             {
                 await using var dbContextInner = AppDbContextFactory.Instance.CreateContext();
-                var entity = new RedisOperationKey { Key = key.Key, OperationId = operationModel.Operation.Id, Operation = operationModel.Operation, Success = false, KeyType = (int)key.KeyType };
+                var entity = new RedisOperationKey { Key = key.Key, OperationId = operationModel.Operation.Id, Success = false, KeyType = (int)key.KeyType };
                 await dbContextInner.RedisOperationKeys.AddAsync(entity, ct);
                 await dbContextInner.SaveChangesAsync(ct);
                 key.Id = entity.Id;
